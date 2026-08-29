@@ -676,6 +676,17 @@
         </div>
       </section>
 
+      <section class="section">
+        <div class="label-row">
+          <span>Blur</span>
+          <span class="muted-value" id="blurLabel">0.50</span>
+        </div>
+
+        <div class="range-wrap">
+          <input id="blurRange" type="range" min="0" max="1" step="0.05" value="0.5" />
+        </div>
+      </section>
+
       <section class="section" id="paletteSection">
         <div class="label-row">
           <span>Palette</span>
@@ -721,6 +732,8 @@
     const densityRange = document.getElementById('densityRange');
     const swatchWrap = document.getElementById('swatchWrap');
     const paletteSection = document.getElementById('paletteSection');
+    const blurRange = document.getElementById('blurRange');
+    const blurLabel = document.getElementById('blurLabel');
     const inkColor = document.getElementById('inkColor');
     const baseColor = document.getElementById('baseColor');
     const inkHex = document.getElementById('inkHex');
@@ -834,6 +847,7 @@
         patternType: document.querySelector('input[name="pattern"]:checked').value,
         dotSize: getDensityValue(),
         textureLevel: parseFloat(textureRange.value),
+        blurLevel: parseFloat(blurRange.value),
         darkColor: inkColor.value,
         lightColor: baseColor.value
       };
@@ -999,7 +1013,7 @@
     }
 
     function renderGlass(targetCtx, imageData, width, height, settings){
-      const { dotSize, textureLevel, darkColor, lightColor } = settings;
+      const { dotSize, textureLevel, blurLevel, darkColor, lightColor } = settings;
       const ink = hexToRgb(darkColor);
       const base = hexToRgb(lightColor);
 
@@ -1041,7 +1055,7 @@
 
       targetCtx.clearRect(0, 0, width, height);
 
-      const blurPx = Math.max(0.8, dotSize * (0.3 + textureLevel * 0.4));
+      const blurPx = Math.max(0.2, blurLevel * 8 + dotSize * (0.2 + textureLevel * 0.2));
       targetCtx.save();
       targetCtx.filter = `blur(${blurPx}px)`;
       targetCtx.drawImage(distorted, 0, 0, width, height);
@@ -1282,6 +1296,11 @@
       scheduleRender();
     });
 
+    blurRange.addEventListener('input', function () {
+      blurLabel.textContent = parseFloat(blurRange.value).toFixed(2);
+      scheduleRender();
+    });
+
     const PHOTO_DERIVED_PATTERNS = new Set(['watercolor', 'glass']);
 
     function updatePaletteAvailability(){
@@ -1355,6 +1374,7 @@
     syncDensityLabel();
     updatePaletteAvailability();
     textureLabel.textContent = parseFloat(textureRange.value).toFixed(2);
+    blurLabel.textContent = parseFloat(blurRange.value).toFixed(2);
   </script>
 </body>
 </html>
