@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
     <title>Branded Image Creator</title>
     <style>
         :root {
@@ -16,11 +17,7 @@
             --error: #ff5252;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -31,7 +28,6 @@
             overflow: hidden;
         }
 
-        /* Layout */
         .app-container {
             display: flex;
             width: 100%;
@@ -58,7 +54,7 @@
             box-shadow: -5px 0 20px rgba(0,0,0,0.3);
         }
 
-        h2 { 
+        h2 {
             font-size: 24px;
             margin-bottom: 25px;
             font-weight: 700;
@@ -66,27 +62,21 @@
             color: #ffffff;
         }
 
-        /* Canvas Styling */
         canvas {
             max-width: 100%;
             max-height: 100%;
             border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            background-image: 
-                linear-gradient(45deg, #2a2a2a 25%, transparent 25%), 
-                linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), 
-                linear-gradient(45deg, transparent 75%, #2a2a2a 75%), 
+            background-image:
+                linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
+                linear-gradient(-45deg, #2a2a2a 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #2a2a2a 75%),
                 linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
             background-size: 20px 20px;
             background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
 
-        /* Controls */
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            margin-bottom: 20px;
-        }
+        .control-group { display: flex; flex-direction: column; margin-bottom: 20px; }
 
         label {
             font-size: 12px;
@@ -97,14 +87,13 @@
             letter-spacing: 0.5px;
         }
 
-        /* Custom File Upload */
         .file-upload-wrapper {
             position: relative;
             overflow: hidden;
             display: inline-block;
             width: 100%;
         }
-        
+
         .file-upload-wrapper input[type="file"] {
             font-size: 100px;
             position: absolute;
@@ -147,7 +136,6 @@
             font-weight: 500;
         }
 
-        /* Inputs */
         select, input[type="color"] {
             width: 100%;
             padding: 10px;
@@ -160,23 +148,11 @@
             cursor: pointer;
         }
 
-        input[type="color"] {
-            height: 42px;
-            padding: 2px;
-        }
+        input[type="color"] { height: 42px; padding: 2px; }
+        input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 
-        input[type="range"] {
-            width: 100%;
-            accent-color: var(--accent);
-            cursor: pointer;
-        }
+        .color-row { display: flex; gap: 15px; }
 
-        .color-row {
-            display: flex;
-            gap: 15px;
-        }
-
-        /* Visual Swatches */
         .swatch-container {
             display: flex;
             gap: 12px;
@@ -207,22 +183,19 @@
     </style>
 </head>
 <body>
-
     <div class="app-container">
-        <!-- Main Canvas Area -->
         <div class="canvas-area">
             <canvas id="canvas"></canvas>
         </div>
 
-        <!-- Right Side Controls panel -->
         <div class="sidebar">
             <h2>HalfTone Gen</h2>
-            
+
             <div class="control-group">
                 <label>Source Image</label>
                 <div class="file-upload-wrapper">
                     <button class="btn">Choose File...</button>
-                    <input type="file" id="upload" accept="image/*">
+                    <input type="file" id="upload" accept="image/png,image/jpeg,image/webp">
                 </div>
                 <div id="error-msg" class="error-message">Unsupported file. Please upload an image.</div>
             </div>
@@ -244,12 +217,10 @@
                 <label for="textureLevel">Texture Jitter</label>
                 <input type="range" id="textureLevel" min="0" max="1" step="0.05" value="0.2">
             </div>
-            
+
             <div class="control-group">
                 <label>Color Presets</label>
-                <div class="swatch-container" id="swatchContainer">
-                    <!-- Swatches injected by JS -->
-                </div>
+                <div class="swatch-container" id="swatchContainer"></div>
             </div>
 
             <div class="color-row">
@@ -272,19 +243,25 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const errorMsg = document.getElementById('error-msg');
-        
+
         const patternTypeInput = document.getElementById('patternType');
         const dotSizeInput = document.getElementById('dotSize');
         const textureLevelInput = document.getElementById('textureLevel');
-        
+
         const darkColorInput = document.getElementById('darkColor');
         const lightColorInput = document.getElementById('lightColor');
         const swatchContainer = document.getElementById('swatchContainer');
         const downloadBtn = document.getElementById('download');
 
-        let originalImage = new Image();
+        const MAX_PREVIEW_DIMENSION = 1500;
+        const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
-        // Color Palettes
+        let originalImage = new Image();
+        let cachedImageData = null;
+        let cachedImageSize = { width: 0, height: 0 };
+        let currentObjectUrl = null;
+        let renderScheduled = false;
+
         const palettes = [
             { dark: '#1a3b2b', light: '#e89c4a', name: 'Forest & Orange' },
             { dark: '#0a1945', light: '#e1cbf4', name: 'Navy & Lavender' },
@@ -295,156 +272,224 @@
             { dark: '#3b0000', light: '#ffeb3b', name: 'Crimson & Gold' }
         ];
 
-        // Generate Visual Swatches
         palettes.forEach(p => {
             const swatch = document.createElement('div');
             swatch.className = 'swatch';
             swatch.title = p.name;
-            // Create a diagonal split of the two colors
             swatch.style.background = `linear-gradient(135deg, ${p.dark} 50%, ${p.light} 50%)`;
-            
+
             swatch.addEventListener('click', () => {
                 darkColorInput.value = p.dark;
                 lightColorInput.value = p.light;
-                if (originalImage.src) generateHalftone();
+                if (cachedImageData) scheduleRender();
             });
             swatchContainer.appendChild(swatch);
         });
 
-        // Handle Image Upload & Validation
-        upload.addEventListener('change', function(e) {
+        function showError(message = 'Unsupported file. Please upload an image.') {
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+        }
+
+        function clearError() {
             errorMsg.style.display = 'none';
-            const file = e.target.files[0];
-            if (!file) return;
+        }
 
-            // Check if uploaded file is actually an image
-            if (!file.type.startsWith('image/')) {
-                errorMsg.style.display = 'block';
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                originalImage.onload = generateHalftone;
-                originalImage.src = event.target.result;
-            }
-            reader.readAsDataURL(file);
-        });
-
-        // Re-draw when any setting changes
-        [patternTypeInput, dotSizeInput, textureLevelInput, darkColorInput, lightColorInput].forEach(input => {
-            input.addEventListener('input', () => {
-                if (originalImage.src) generateHalftone();
-            });
-        });
-
-        // Main Rendering Logic
-        function generateHalftone() {
-            const patternType = patternTypeInput.value;
-            const dotSize = parseInt(dotSizeInput.value);
-            const textureLevel = parseFloat(textureLevelInput.value);
-            const darkColor = darkColorInput.value;
-            const lightColor = lightColorInput.value;
-
-            canvas.width = originalImage.width;
-            canvas.height = originalImage.height;
-
+        function createImageDataFromImage(img, width, height) {
             const offscreenCanvas = document.createElement('canvas');
-            offscreenCanvas.width = canvas.width;
-            offscreenCanvas.height = canvas.height;
-            const offCtx = offscreenCanvas.getContext('2d');
-            offCtx.drawImage(originalImage, 0, 0);
-            
-            const imageData = offCtx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
+            offscreenCanvas.width = width;
+            offscreenCanvas.height = height;
+            const offCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+            offCtx.drawImage(img, 0, 0, width, height);
+            return { imageData: offCtx.getImageData(0, 0, width, height), width, height };
+        }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        function preparePreviewImageData() {
+            const sourceWidth = originalImage.naturalWidth || originalImage.width;
+            const sourceHeight = originalImage.naturalHeight || originalImage.height;
+            const scale = Math.min(1, MAX_PREVIEW_DIMENSION / Math.max(sourceWidth, sourceHeight));
+            const width = Math.max(1, Math.round(sourceWidth * scale));
+            const height = Math.max(1, Math.round(sourceHeight * scale));
+            const prepared = createImageDataFromImage(originalImage, width, height);
+            cachedImageData = prepared.imageData;
+            cachedImageSize = { width: prepared.width, height: prepared.height };
+        }
 
-            for (let y = 0; y < canvas.height; y += dotSize) {
-                for (let x = 0; x < canvas.width; x += dotSize) {
-                    
+        function renderHalftoneToContext(targetCtx, imageData, width, height, settings) {
+            const { patternType, dotSize, textureLevel, darkColor, lightColor } = settings;
+            const pixels = imageData.data;
+
+            targetCtx.clearRect(0, 0, width, height);
+
+            for (let y = 0; y < height; y += dotSize) {
+                for (let x = 0; x < width; x += dotSize) {
                     let totalLuminance = 0;
                     let totalAlpha = 0;
                     let pixelCount = 0;
 
                     for (let dy = 0; dy < dotSize; dy++) {
                         for (let dx = 0; dx < dotSize; dx++) {
-                            if (x + dx < canvas.width && y + dy < canvas.height) {
-                                const i = ((y + dy) * canvas.width + (x + dx)) * 4;
-                                const r = data[i];
-                                const g = data[i+1];
-                                const b = data[i+2];
-                                const a = data[i+3]; 
-                                
-                                const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-                                totalLuminance += luminance;
-                                totalAlpha += a;
-                                pixelCount++;
-                            }
+                            const currentX = x + dx;
+                            const currentY = y + dy;
+                            if (currentX >= width || currentY >= height) continue;
+
+                            const i = (currentY * width + currentX) * 4;
+                            const r = pixels[i];
+                            const g = pixels[i + 1];
+                            const b = pixels[i + 2];
+                            const a = pixels[i + 3];
+
+                            totalLuminance += (0.299 * r + 0.587 * g + 0.114 * b);
+                            totalAlpha += a;
+                            pixelCount++;
                         }
                     }
 
-                    const avgAlpha = totalAlpha / pixelCount;
-                    if (avgAlpha < 15) {
-                        continue; 
-                    }
+                    if (!pixelCount) continue;
 
-                    // Background Fill
-                    ctx.fillStyle = lightColor;
-                    ctx.fillRect(x, y, dotSize, dotSize);
+                    const avgAlpha = totalAlpha / pixelCount;
+                    if (avgAlpha < 15) continue;
+
+                    targetCtx.fillStyle = lightColor;
+                    targetCtx.fillRect(x, y, dotSize, dotSize);
 
                     let avgLuminance = totalLuminance / pixelCount;
-                    
-                    // Texture noise
                     const noise = (Math.random() - 0.5) * 100 * textureLevel;
                     avgLuminance = Math.max(0, Math.min(255, avgLuminance + noise));
-                    
+
                     const darkness = 1 - (avgLuminance / 255);
                     const sizeMultiplier = 1.3 + (Math.random() - 0.5) * textureLevel * 0.6;
-                    
+
                     const jitterX = (Math.random() - 0.5) * textureLevel * dotSize * 0.4;
                     const jitterY = (Math.random() - 0.5) * textureLevel * dotSize * 0.4;
-                    
+
                     const centerX = x + (dotSize / 2) + jitterX;
                     const centerY = y + (dotSize / 2) + jitterY;
 
                     if (patternType === 'dots') {
                         const radius = (dotSize / 2) * darkness * sizeMultiplier;
                         if (radius > 0.5) {
-                            ctx.fillStyle = darkColor;
-                            ctx.beginPath();
-                            ctx.arc(centerX, centerY, Math.min(Math.abs(radius), dotSize * 1.5), 0, Math.PI * 2);
-                            ctx.fill();
+                            targetCtx.fillStyle = darkColor;
+                            targetCtx.beginPath();
+                            targetCtx.arc(centerX, centerY, Math.min(Math.abs(radius), dotSize * 1.5), 0, Math.PI * 2);
+                            targetCtx.fill();
                         }
                     } else if (patternType === 'lines') {
                         const lineWidth = dotSize * darkness * sizeMultiplier * 1.2;
                         if (lineWidth > 0.5) {
-                            ctx.strokeStyle = darkColor;
-                            ctx.lineWidth = Math.min(lineWidth, dotSize * 1.5);
-                            ctx.lineCap = 'round';
-                            ctx.beginPath();
-                            
-                            const angle = Math.PI / 4; 
-                            const length = dotSize * 1.5; 
-                            
+                            targetCtx.strokeStyle = darkColor;
+                            targetCtx.lineWidth = Math.min(lineWidth, dotSize * 1.5);
+                            targetCtx.lineCap = 'round';
+                            targetCtx.beginPath();
+
+                            const angle = Math.PI / 4;
+                            const length = dotSize * 1.5;
                             const dx = Math.cos(angle) * (length / 2);
                             const dy = Math.sin(angle) * (length / 2);
 
-                            ctx.moveTo(centerX - dx, centerY - dy);
-                            ctx.lineTo(centerX + dx, centerY + dy);
-                            ctx.stroke();
+                            targetCtx.moveTo(centerX - dx, centerY - dy);
+                            targetCtx.lineTo(centerX + dx, centerY + dy);
+                            targetCtx.stroke();
                         }
                     }
                 }
             }
         }
 
+        function generateHalftone() {
+            if (!cachedImageData) return;
+
+            canvas.width = cachedImageSize.width;
+            canvas.height = cachedImageSize.height;
+
+            renderHalftoneToContext(ctx, cachedImageData, cachedImageSize.width, cachedImageSize.height, {
+                patternType: patternTypeInput.value,
+                dotSize: parseInt(dotSizeInput.value, 10),
+                textureLevel: parseFloat(textureLevelInput.value),
+                darkColor: darkColorInput.value,
+                lightColor: lightColorInput.value
+            });
+        }
+
+        function scheduleRender() {
+            if (!cachedImageData || renderScheduled) return;
+            renderScheduled = true;
+            requestAnimationFrame(() => {
+                renderScheduled = false;
+                generateHalftone();
+            });
+        }
+
+        upload.addEventListener('change', function(e) {
+            clearError();
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            const type = file.type ? file.type.toLowerCase() : '';
+            const hasValidExtension = /\.(png|jpe?g|webp)$/i.test(file.name || '');
+            if (!ALLOWED_IMAGE_TYPES.has(type) && !hasValidExtension) {
+                showError();
+                upload.value = '';
+                return;
+            }
+
+            if (currentObjectUrl) {
+                URL.revokeObjectURL(currentObjectUrl);
+                currentObjectUrl = null;
+            }
+
+            currentObjectUrl = URL.createObjectURL(file);
+            originalImage.onload = () => {
+                preparePreviewImageData();
+                scheduleRender();
+            };
+            originalImage.onerror = () => {
+                showError('Could not load image. Please choose a valid PNG, JPG, or WebP file.');
+            };
+            originalImage.src = currentObjectUrl;
+        });
+
+        [patternTypeInput, dotSizeInput, textureLevelInput, darkColorInput, lightColorInput].forEach(input => {
+            input.addEventListener('input', () => {
+                if (cachedImageData) scheduleRender();
+            });
+        });
+
         downloadBtn.addEventListener('click', () => {
-            if (!originalImage.src) return alert("Please upload an image first!");
-            const link = document.createElement('a');
-            link.download = 'halftone-gen-output.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+            if (!cachedImageData) {
+                alert('Please upload an image first!');
+                return;
+            }
+
+            const sourceWidth = originalImage.naturalWidth || originalImage.width;
+            const sourceHeight = originalImage.naturalHeight || originalImage.height;
+            const fullImage = createImageDataFromImage(originalImage, sourceWidth, sourceHeight);
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = sourceWidth;
+            exportCanvas.height = sourceHeight;
+            const exportCtx = exportCanvas.getContext('2d');
+
+            renderHalftoneToContext(exportCtx, fullImage.imageData, sourceWidth, sourceHeight, {
+                patternType: patternTypeInput.value,
+                dotSize: parseInt(dotSizeInput.value, 10),
+                textureLevel: parseFloat(textureLevelInput.value),
+                darkColor: darkColorInput.value,
+                lightColor: lightColorInput.value
+            });
+
+            exportCanvas.toBlob((blob) => {
+                if (!blob) {
+                    alert('Could not generate the download for this image. Please try a smaller file.');
+                    return;
+                }
+
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = 'halftone-gen-output.png';
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+            }, 'image/png');
         });
     </script>
 </body>
