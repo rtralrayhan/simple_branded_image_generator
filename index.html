@@ -349,6 +349,14 @@
       padding-top:4px;
     }
 
+    #blurSection{
+      display:none;
+    }
+
+    #blurSection.is-visible{
+      display:block;
+    }
+
     input[type="range"]{
       width:100%;
       appearance:none;
@@ -676,7 +684,7 @@
         </div>
       </section>
 
-      <section class="section">
+      <section class="section" id="blurSection">
         <div class="label-row">
           <span>Blur</span>
           <span class="muted-value" id="blurLabel">0.50</span>
@@ -734,6 +742,7 @@
     const paletteSection = document.getElementById('paletteSection');
     const blurRange = document.getElementById('blurRange');
     const blurLabel = document.getElementById('blurLabel');
+    const blurSection = document.getElementById('blurSection');
     const inkColor = document.getElementById('inkColor');
     const baseColor = document.getElementById('baseColor');
     const inkHex = document.getElementById('inkHex');
@@ -990,7 +999,7 @@
       }
 
       // Blur melts the wash blobs and ink lines into soft, bleeding edges.
-      const blurPx = Math.max(0.6, dotSize * (0.55 - textureLevel * 0.28));
+      const blurPx = 0.6 + textureLevel * 0.4;
       targetCtx.clearRect(0, 0, width, height);
       targetCtx.save();
       targetCtx.filter = `blur(${blurPx}px)`;
@@ -1055,7 +1064,7 @@
 
       targetCtx.clearRect(0, 0, width, height);
 
-      const blurPx = Math.max(0.2, blurLevel * 8 + dotSize * (0.2 + textureLevel * 0.2));
+      const blurPx = blurLevel * 10;
       targetCtx.save();
       targetCtx.filter = `blur(${blurPx}px)`;
       targetCtx.drawImage(distorted, 0, 0, width, height);
@@ -1310,6 +1319,10 @@
       document.querySelectorAll('#swatchWrap input[type="radio"]').forEach(input => {
         input.disabled = isPhotoDerived;
       });
+      
+      // Show blur section only for glass pattern
+      const isGlass = patternType === 'glass';
+      blurSection.classList.toggle('is-visible', isGlass);
     }
 
     document.querySelectorAll('input[name="pattern"]').forEach(input => {
