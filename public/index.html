@@ -392,6 +392,16 @@
       gap:10px;
     }
 
+    #paletteSection.is-disabled .swatch-wrap{
+      opacity:.35;
+      pointer-events:none;
+      filter:grayscale(1);
+    }
+
+    #paletteSection.is-disabled #paletteHint{
+      display:inline !important;
+    }
+
     .swatch{
       position:relative;
       width:28px;height:28px;
@@ -579,7 +589,7 @@
 
       <section class="section">
         <div class="label-row">
-          <span>Pattern</span>
+          <span>Style</span>
         </div>
         <div class="pattern-grid">
           <label class="pattern-choice">
@@ -612,6 +622,35 @@
               <span class="pattern-name">Lines</span>
             </span>
           </label>
+
+          <label class="pattern-choice">
+            <input type="radio" name="pattern" value="watercolor" />
+            <span class="pattern-card">
+              <span class="pattern-top">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3c2.7 3.4 6.5 6 6.5 10.1A6.5 6.5 0 0 1 12 19.6 6.5 6.5 0 0 1 5.5 13.1C5.5 9 9.3 6.4 12 3z"></path>
+                </svg>
+                <span class="pattern-dot"></span>
+              </span>
+              <span class="pattern-name">Watercolor</span>
+            </span>
+          </label>
+
+          <label class="pattern-choice">
+            <input type="radio" name="pattern" value="glass" />
+            <span class="pattern-card">
+              <span class="pattern-top">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 4v16"></path>
+                  <path d="M10 4v16"></path>
+                  <path d="M15 4v16"></path>
+                  <path d="M19.5 4v16"></path>
+                </svg>
+                <span class="pattern-dot"></span>
+              </span>
+              <span class="pattern-name">Glass</span>
+            </span>
+          </label>
         </div>
       </section>
 
@@ -637,9 +676,10 @@
         </div>
       </section>
 
-      <section class="section">
+      <section class="section" id="paletteSection">
         <div class="label-row">
           <span>Palette</span>
+          <span class="muted-value" id="paletteHint" style="display:none;">Uses photo colours</span>
         </div>
         <div class="swatch-wrap" id="swatchWrap"></div>
       </section>
@@ -680,6 +720,7 @@
     const densityLabel = document.getElementById('densityLabel');
     const densityRange = document.getElementById('densityRange');
     const swatchWrap = document.getElementById('swatchWrap');
+    const paletteSection = document.getElementById('paletteSection');
     const inkColor = document.getElementById('inkColor');
     const baseColor = document.getElementById('baseColor');
     const inkHex = document.getElementById('inkHex');
@@ -798,11 +839,260 @@
       };
     }
 
+    function hexToRgb(hex){
+      const clean = hex.replace('#', '');
+      const value = parseInt(clean, 16);
+      return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+    }
+
+    function posterize(value, levels){
+      const v = Math.max(0, Math.min(255, value));
+      const step = 255 / (levels - 1);
+      return Math.round(v / step) * step;
+    }
+
+    function wavyStroke(ctx, x1, y1, x2, y2, amplitude){
+      const midX = (x1 + x2) / 2 + (Math.random() - 0.5) * amplitude;
+      const midY = (y1 + y2) / 2 + (Math.random() - 0.5) * amplitude;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.quadraticCurveTo(midX, midY, x2, y2);
+      ctx.stroke();
+    }
+
+    function renderWatercolor(targetCtx, imageData, width, height, settings){
+      const { dotSize, textureLevel, darkColor, lightColor } = settings;
+      const pixels = imageData.data;
+      const cols = Math.ceil(width / dotSize);
+      const rows = Math.ceil(height / dotSize);
+      const levels = Math.max(4, Math.round(10 - textureLevel * 5));
+      const ink = hexToRgb(darkColor);
+      const tint = hexToRgb(lightColor);
+      const tintAmount = 0.1;
+
+      const cells = new Array(cols * rows).fill(null);
+
+      for (let cy = 0; cy < rows; cy++) {
+        for (let cx = 0; cx < cols; cx++) {
+          const x0 = cx * dotSize;
+          const y0 = cy * dotSize;
+          let sumR = 0, sumG = 0, sumB = 0, sumA = 0, count = 0;
+
+          for (let dy = 0; dy < dotSize; dy++) {
+            const py = y0 + dy;
+            if (py >= height) break;
+            for (let dx = 0; dx < dotSize; dx++) {
+              const px = x0 + dx;
+              if (px >= width) break;
+              const i = (py * width + px) * 4;
+              sumR += pixels[i];
+              sumG += pixels[i + 1];
+              sumB += pixels[i + 2];
+              sumA += pixels[i + 3];
+              count++;
+            }
+          }
+
+          if (!count) continue;
+          const avgAlpha = sumA / count;
+          if (avgAlpha < 15) continue;
+
+          const noise = (Math.random() - 0.5) * 8 * textureLevel;
+          let r = posterize(sumR / count + noise, levels);
+          let g = posterize(sumG / count + noise, levels);
+          let b = posterize(sumB / count + noise, levels);
+
+          r += (tint.r - r) * tintAmount;
+          g += (tint.g - g) * tintAmount;
+          b += (tint.b - b) * tintAmount;
+
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          cells[cy * cols + cx] = { r, g, b, lum };
+        }
+      }
+
+      // Paint layer: soft overlapping washes, drawn before blur so edges bleed together.
+      const paint = document.createElement('canvas');
+      paint.width = width;
+      paint.height = height;
+      const pctx = paint.getContext('2d');
+
+      for (let cy = 0; cy < rows; cy++) {
+        for (let cx = 0; cx < cols; cx++) {
+          const c = cells[cy * cols + cx];
+          if (!c) continue;
+          const x0 = cx * dotSize;
+          const y0 = cy * dotSize;
+          const jitterX = (Math.random() - 0.5) * dotSize * 0.4;
+          const jitterY = (Math.random() - 0.5) * dotSize * 0.4;
+          const px = x0 + dotSize / 2 + jitterX;
+          const py = y0 + dotSize / 2 + jitterY;
+          const radius = dotSize * (0.8 + Math.random() * 0.3);
+          const fill = `rgb(${c.r | 0}, ${c.g | 0}, ${c.b | 0})`;
+
+          pctx.fillStyle = fill;
+          pctx.globalAlpha = 0.78;
+          pctx.beginPath();
+          pctx.arc(px, py, radius, 0, Math.PI * 2);
+          pctx.fill();
+
+          pctx.globalAlpha = 0.4;
+          pctx.beginPath();
+          pctx.arc(
+            px + (Math.random() - 0.5) * dotSize * 0.6,
+            py + (Math.random() - 0.5) * dotSize * 0.6,
+            radius * 0.6, 0, Math.PI * 2
+          );
+          pctx.fill();
+        }
+      }
+      pctx.globalAlpha = 1;
+
+      // Soft ink accents at strong edges — wavy, low-opacity brush lines that bleed once blurred.
+      const threshold = 46;
+      pctx.strokeStyle = `rgba(${ink.r}, ${ink.g}, ${ink.b}, 0.45)`;
+      pctx.lineWidth = Math.max(1.5, dotSize * 0.4);
+      pctx.lineCap = 'round';
+      pctx.lineJoin = 'round';
+      const wobble = dotSize * 0.4;
+
+      for (let cy = 0; cy < rows; cy++) {
+        for (let cx = 0; cx < cols; cx++) {
+          const c = cells[cy * cols + cx];
+          if (!c) continue;
+          const x0 = cx * dotSize;
+          const y0 = cy * dotSize;
+
+          const right = cx + 1 < cols ? cells[cy * cols + cx + 1] : null;
+          if (right && Math.abs(right.lum - c.lum) > threshold) {
+            wavyStroke(pctx, x0 + dotSize, y0, x0 + dotSize, y0 + dotSize, wobble);
+          }
+
+          const down = cy + 1 < rows ? cells[(cy + 1) * cols + cx] : null;
+          if (down && Math.abs(down.lum - c.lum) > threshold) {
+            wavyStroke(pctx, x0, y0 + dotSize, x0 + dotSize, y0 + dotSize, wobble);
+          }
+        }
+      }
+
+      // Blur melts the wash blobs and ink lines into soft, bleeding edges.
+      const blurPx = Math.max(0.6, dotSize * (0.55 - textureLevel * 0.28));
+      targetCtx.clearRect(0, 0, width, height);
+      targetCtx.save();
+      targetCtx.filter = `blur(${blurPx}px)`;
+      targetCtx.drawImage(paint, 0, 0);
+      targetCtx.restore();
+
+      // Paper grain / pigment granulation, layered on top crisp (unblurred).
+      const speckleCount = Math.round(cols * rows * (0.12 + textureLevel * 0.35));
+      const speckleAlpha = 0.035 + textureLevel * 0.06;
+      for (let i = 0; i < speckleCount; i++) {
+        const rx = Math.random() * width;
+        const ry = Math.random() * height;
+        const size = Math.random() * dotSize * 0.4 + 0.5;
+        const dark = Math.random() < 0.5;
+        targetCtx.fillStyle = dark
+          ? `rgba(0,0,0,${speckleAlpha})`
+          : `rgba(255,255,255,${speckleAlpha})`;
+        targetCtx.fillRect(rx, ry, size, size);
+      }
+    }
+
+    function renderGlass(targetCtx, imageData, width, height, settings){
+      const { dotSize, textureLevel, darkColor, lightColor } = settings;
+      const ink = hexToRgb(darkColor);
+      const base = hexToRgb(lightColor);
+
+      const srcCanvas = document.createElement('canvas');
+      srcCanvas.width = width;
+      srcCanvas.height = height;
+      srcCanvas.getContext('2d').putImageData(imageData, 0, 0);
+
+      const stripeWidth = Math.max(6, dotSize * 5);
+      const stripeCount = Math.ceil(width / stripeWidth);
+      const maxShift = stripeWidth * (0.35 + textureLevel * 0.55);
+      const maxVerticalShift = height * 0.02 * (0.6 + textureLevel * 1.4);
+      const seed = Math.random() * Math.PI * 2;
+
+      // Build the sliced/shifted image on its own layer so the blur below
+      // softens the glass distortion without smearing the shading on top.
+      const distorted = document.createElement('canvas');
+      distorted.width = width;
+      distorted.height = height;
+      const dctx = distorted.getContext('2d');
+
+      // Base pass avoids gaps where a stripe's vertical shift exposes empty canvas.
+      dctx.drawImage(srcCanvas, 0, 0, width, height);
+
+      for (let i = 0; i < stripeCount; i++) {
+        const x0 = i * stripeWidth;
+        const w = Math.min(stripeWidth, width - x0);
+        if (w <= 0) continue;
+
+        const wave = Math.sin(i * 0.85 + seed);
+        const wave2 = Math.sin(i * 1.7 + seed * 1.3);
+
+        let sourceX = x0 + wave * maxShift;
+        sourceX = Math.max(0, Math.min(width - w, sourceX));
+        const verticalOffset = wave2 * maxVerticalShift;
+
+        dctx.drawImage(srcCanvas, sourceX, 0, w, height, x0, verticalOffset, w, height);
+      }
+
+      targetCtx.clearRect(0, 0, width, height);
+
+      const blurPx = Math.max(0.8, dotSize * (0.3 + textureLevel * 0.4));
+      targetCtx.save();
+      targetCtx.filter = `blur(${blurPx}px)`;
+      targetCtx.drawImage(distorted, 0, 0, width, height);
+      targetCtx.restore();
+
+      // Ridge shading per stripe: shadow at the seams, a bright sheen down the middle.
+      for (let i = 0; i < stripeCount; i++) {
+        const x0 = i * stripeWidth;
+        const w = Math.min(stripeWidth, width - x0);
+        if (w <= 0) continue;
+
+        const shadowAlpha = 0.28;
+        const highlightAlpha = 0.22 + textureLevel * 0.18;
+
+        const grad = targetCtx.createLinearGradient(x0, 0, x0 + w, 0);
+        grad.addColorStop(0, `rgba(${ink.r},${ink.g},${ink.b},${shadowAlpha})`);
+        grad.addColorStop(0.22, `rgba(${ink.r},${ink.g},${ink.b},0)`);
+        grad.addColorStop(0.55, `rgba(${base.r},${base.g},${base.b},${highlightAlpha})`);
+        grad.addColorStop(0.78, `rgba(${base.r},${base.g},${base.b},0)`);
+        grad.addColorStop(1, `rgba(${ink.r},${ink.g},${ink.b},${shadowAlpha * 0.8})`);
+
+        targetCtx.fillStyle = grad;
+        targetCtx.fillRect(x0, 0, w, height);
+      }
+
+      // Soft diagonal sheen across the whole surface for extra glass gloss.
+      const sweep = targetCtx.createLinearGradient(0, 0, width, height);
+      sweep.addColorStop(0, 'rgba(255,255,255,0.10)');
+      sweep.addColorStop(0.35, 'rgba(255,255,255,0)');
+      sweep.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+      sweep.addColorStop(0.65, 'rgba(255,255,255,0)');
+      sweep.addColorStop(1, 'rgba(255,255,255,0.08)');
+      targetCtx.fillStyle = sweep;
+      targetCtx.fillRect(0, 0, width, height);
+    }
+
     function renderHalftone(targetCtx, imageData, width, height, settings){
       const pixels = imageData.data;
       const { patternType, dotSize, textureLevel, darkColor, lightColor } = settings;
 
       targetCtx.clearRect(0, 0, width, height);
+
+      if (patternType === 'watercolor') {
+        renderWatercolor(targetCtx, imageData, width, height, settings);
+        return;
+      }
+
+      if (patternType === 'glass') {
+        renderGlass(targetCtx, imageData, width, height, settings);
+        return;
+      }
 
       for (let y = 0; y < height; y += dotSize) {
         for (let x = 0; x < width; x += dotSize) {
@@ -855,7 +1145,7 @@
               targetCtx.arc(centerX, centerY, Math.min(Math.abs(radius), dotSize * 1.5), 0, Math.PI * 2);
               targetCtx.fill();
             }
-          } else {
+          } else if (patternType === 'lines') {
             const lineDarkness = Math.max(0.2, Math.min(0.9, darkness * 0.72));
             const lineWidth = dotSize * lineDarkness * sizeAdj * 0.8;
             if (lineWidth > 0.5) {
@@ -872,6 +1162,23 @@
               targetCtx.moveTo(centerX - dx, centerY - dy);
               targetCtx.lineTo(centerX + dx, centerY + dy);
               targetCtx.stroke();
+            }
+          } else {
+            const blobRadius = (dotSize * 0.9) * (0.35 + darkness * 0.95) * sizeAdj;
+            if (blobRadius > 0.8) {
+              const prevAlpha = targetCtx.globalAlpha;
+              targetCtx.fillStyle = darkColor;
+              targetCtx.globalAlpha = Math.min(0.65, 0.18 + darkness * 0.42);
+              targetCtx.beginPath();
+              targetCtx.arc(centerX, centerY, blobRadius, 0, Math.PI * 2);
+              targetCtx.fill();
+
+              targetCtx.globalAlpha = Math.min(0.5, 0.12 + darkness * 0.26);
+              targetCtx.beginPath();
+              targetCtx.arc(centerX - dotSize * 0.15, centerY + dotSize * 0.1, blobRadius * 0.8, 0, Math.PI * 2);
+              targetCtx.fill();
+
+              targetCtx.globalAlpha = prevAlpha;
             }
           }
         }
@@ -975,8 +1282,22 @@
       scheduleRender();
     });
 
+    const PHOTO_DERIVED_PATTERNS = new Set(['watercolor', 'glass']);
+
+    function updatePaletteAvailability(){
+      const patternType = document.querySelector('input[name="pattern"]:checked').value;
+      const isPhotoDerived = PHOTO_DERIVED_PATTERNS.has(patternType);
+      paletteSection.classList.toggle('is-disabled', isPhotoDerived);
+      document.querySelectorAll('#swatchWrap input[type="radio"]').forEach(input => {
+        input.disabled = isPhotoDerived;
+      });
+    }
+
     document.querySelectorAll('input[name="pattern"]').forEach(input => {
-      input.addEventListener('change', scheduleRender);
+      input.addEventListener('change', function () {
+        updatePaletteAvailability();
+        scheduleRender();
+      });
     });
 
     inkColor.addEventListener('input', function () {
@@ -1032,6 +1353,7 @@
     buildPaletteSwatches();
     updateHexLabels();
     syncDensityLabel();
+    updatePaletteAvailability();
     textureLabel.textContent = parseFloat(textureRange.value).toFixed(2);
   </script>
 </body>
