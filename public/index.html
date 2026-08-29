@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none';">
     <title>Branded Image Creator</title>
     <style>
         :root {
@@ -24,6 +24,7 @@
             background: var(--bg-main);
             color: var(--text-main);
             height: 100vh;
+            height: 100dvh;
             display: flex;
             overflow: hidden;
         }
@@ -128,6 +129,20 @@
         .btn:hover { background: #444; }
         .btn-primary:hover { background: var(--accent-hover); }
 
+        .file-upload-wrapper input[type="file"]:focus-visible + .btn {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.4);
+        }
+
+        .file-name {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            word-break: break-all;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
         .error-message {
             color: var(--error);
             font-size: 13px;
@@ -189,14 +204,15 @@
         </div>
 
         <div class="sidebar">
-            <h2>HalfTone Gen</h2>
+            <h2>Branded Image Creator</h2>
 
             <div class="control-group">
                 <label>Source Image</label>
                 <div class="file-upload-wrapper">
-                    <button class="btn">Choose File...</button>
                     <input type="file" id="upload" accept="image/png,image/jpeg,image/webp">
+                    <label class="btn" for="upload">Choose File...</label>
                 </div>
+                <div id="file-name" class="file-name">No file selected</div>
                 <div id="error-msg" class="error-message">Unsupported file. Please upload an image.</div>
             </div>
 
@@ -252,9 +268,15 @@
         const lightColorInput = document.getElementById('lightColor');
         const swatchContainer = document.getElementById('swatchContainer');
         const downloadBtn = document.getElementById('download');
+        const fileNameEl = document.getElementById('file-name');
 
         const MAX_PREVIEW_DIMENSION = 1500;
+
+        const MAX_EXPORT_DIMENSION = 4096;
+        const MAX_EXPORT_PIXELS = 12e6;
+
         const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+        const ALLOWED_EXTENSIONS = /\.(png|jpe?g|webp)$/i;
 
         let originalImage = new Image();
         let cachedImageData = null;
@@ -295,11 +317,35 @@
             errorMsg.style.display = 'none';
         }
 
-        function createImageDataFromImage(img, width, height) {
+        function releaseObjectUrl() {
+            if (currentObjectUrl) {
+                URL.revokeObjectURL(currentObjectUrl);
+                currentObjectUrl = null;
+            }
+        }
+
+        function resetImage() {
+            cachedImageData = null;
+            cachedImageSize = { width: 0, height: 0 };
+            canvas.width = 0;
+            canvas.height = 0;
+        }
+
+        function fitWithin(width, height, maxDimension, maxPixels) {
+            let scale = Math.min(1, maxDimension / Math.max(width, height));
+            const pixels = (width * scale) * (height * scale);
+            if (pixels > maxPixels) scale *= Math.sqrt(maxPixels / pixels);
+            return {
+                width: Math.max(1, Math.round(width * scale)),
+                height: Math.max(1, Math.round(height * scale))
+            };
+        }
+
+        function createImageDataFromImage(img, width, height, willReadFrequently = false) {
             const offscreenCanvas = document.createElement('canvas');
             offscreenCanvas.width = width;
             offscreenCanvas.height = height;
-            const offCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+            const offCtx = offscreenCanvas.getContext('2d', { willReadFrequently });
             offCtx.drawImage(img, 0, 0, width, height);
             return { imageData: offCtx.getImageData(0, 0, width, height), width, height };
         }
@@ -307,10 +353,10 @@
         function preparePreviewImageData() {
             const sourceWidth = originalImage.naturalWidth || originalImage.width;
             const sourceHeight = originalImage.naturalHeight || originalImage.height;
-            const scale = Math.min(1, MAX_PREVIEW_DIMENSION / Math.max(sourceWidth, sourceHeight));
-            const width = Math.max(1, Math.round(sourceWidth * scale));
-            const height = Math.max(1, Math.round(sourceHeight * scale));
-            const prepared = createImageDataFromImage(originalImage, width, height);
+            const { width, height } = fitWithin(
+                sourceWidth, sourceHeight, MAX_PREVIEW_DIMENSION, MAX_PREVIEW_DIMENSION * MAX_PREVIEW_DIMENSION
+            );
+            const prepared = createImageDataFromImage(originalImage, width, height, true);
             cachedImageData = prepared.imageData;
             cachedImageSize = { width: prepared.width, height: prepared.height };
         }
@@ -426,17 +472,17 @@
             if (!file) return;
 
             const type = file.type ? file.type.toLowerCase() : '';
-            const hasValidExtension = /\.(png|jpe?g|webp)$/i.test(file.name || '');
-            if (!ALLOWED_IMAGE_TYPES.has(type) && !hasValidExtension) {
+            const hasValidExtension = ALLOWED_EXTENSIONS.test(file.name || '');
+            const isAllowed = type ? ALLOWED_IMAGE_TYPES.has(type) : hasValidExtension;
+            if (!isAllowed) {
                 showError();
                 upload.value = '';
+                fileNameEl.textContent = 'No file selected';
                 return;
             }
 
-            if (currentObjectUrl) {
-                URL.revokeObjectURL(currentObjectUrl);
-                currentObjectUrl = null;
-            }
+            releaseObjectUrl();
+            fileNameEl.textContent = file.name || 'Selected image';
 
             currentObjectUrl = URL.createObjectURL(file);
             originalImage.onload = () => {
@@ -444,6 +490,10 @@
                 scheduleRender();
             };
             originalImage.onerror = () => {
+                releaseObjectUrl();
+                resetImage();
+                upload.value = '';
+                fileNameEl.textContent = 'No file selected';
                 showError('Could not load image. Please choose a valid PNG, JPG, or WebP file.');
             };
             originalImage.src = currentObjectUrl;
@@ -463,15 +513,27 @@
 
             const sourceWidth = originalImage.naturalWidth || originalImage.width;
             const sourceHeight = originalImage.naturalHeight || originalImage.height;
-            const fullImage = createImageDataFromImage(originalImage, sourceWidth, sourceHeight);
+
+            const exportSize = fitWithin(
+                sourceWidth, sourceHeight, MAX_EXPORT_DIMENSION, MAX_EXPORT_PIXELS
+            );
+
+            const exportScale = exportSize.width / cachedImageSize.width;
+            const exportDotSize = Math.max(
+                1, Math.round(parseInt(dotSizeInput.value, 10) * exportScale)
+            );
+
+            const fullImage = createImageDataFromImage(
+                originalImage, exportSize.width, exportSize.height
+            );
             const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = sourceWidth;
-            exportCanvas.height = sourceHeight;
+            exportCanvas.width = exportSize.width;
+            exportCanvas.height = exportSize.height;
             const exportCtx = exportCanvas.getContext('2d');
 
-            renderHalftoneToContext(exportCtx, fullImage.imageData, sourceWidth, sourceHeight, {
+            renderHalftoneToContext(exportCtx, fullImage.imageData, exportSize.width, exportSize.height, {
                 patternType: patternTypeInput.value,
-                dotSize: parseInt(dotSizeInput.value, 10),
+                dotSize: exportDotSize,
                 textureLevel: parseFloat(textureLevelInput.value),
                 darkColor: darkColorInput.value,
                 lightColor: lightColorInput.value
@@ -487,8 +549,10 @@
                 const link = document.createElement('a');
                 link.download = 'halftone-gen-output.png';
                 link.href = url;
+                document.body.appendChild(link);
                 link.click();
-                URL.revokeObjectURL(url);
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
             }, 'image/png');
         });
     </script>
