@@ -1064,6 +1064,7 @@
 
       targetCtx.clearRect(0, 0, width, height);
 
+      // Apply blur only to the distorted base image
       const blurPx = blurLevel * 10;
       targetCtx.save();
       targetCtx.filter = `blur(${blurPx}px)`;
@@ -1071,6 +1072,7 @@
       targetCtx.restore();
 
       // Ridge shading per stripe: shadow at the seams, a bright sheen down the middle.
+      // Applied AFTER blur on top without blur effect
       for (let i = 0; i < stripeCount; i++) {
         const x0 = i * stripeWidth;
         const w = Math.min(stripeWidth, width - x0);
