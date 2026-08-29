@@ -1,560 +1,1080 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none';">
-    <title>Branded Image Creator</title>
-    <style>
-        :root {
-            --bg-main: #121212;
-            --bg-panel: #1e1e1e;
-            --text-main: #e0e0e0;
-            --text-muted: #9e9e9e;
-            --accent: #6c5ce7;
-            --accent-hover: #5a4bcf;
-            --border: #333333;
-            --error: #ff5252;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none';">
+  <meta name="color-scheme" content="dark" />
+  <title>Brand Texture Studio</title>
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --panel:#121212;
+      --panel-2:#171717;
+      --panel-3:#1f1f1f;
+      --line:#2a2a2a;
+      --line-strong:#3a3a3a;
+      --text:#f3f3f3;
+      --muted:#a5a5a5;
+      --soft:#6d6d6d;
+      --brand:#d8b276;
+      --error:#ff6b6b;
+      --shadow:0 16px 40px rgba(0,0,0,.35);
+      --radius:18px;
+      --radius-small:10px;
+      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing:border-box; margin:0; padding:0; }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--bg-main);
-            color: var(--text-main);
-            height: 100vh;
-            height: 100dvh;
-            display: flex;
-            overflow: hidden;
-        }
+    html, body { height:100%; }
+    body{
+      font-family:var(--font);
+      background:var(--bg);
+      color:var(--text);
+      display:flex;
+      justify-content:center;
+      align-items:stretch;
+      min-height:100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
 
-        .app-container {
-            display: flex;
-            width: 100%;
-            height: 100%;
-        }
+    .app-shell{
+      width:100%;
+      height:100dvh;
+      display:flex;
+      background:radial-gradient(circle at top left, rgba(216,178,118,.08), transparent 22%),
+                 var(--bg);
+    }
 
-        .canvas-area {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            overflow: auto;
-        }
+    .stage{
+      flex:1;
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:42px;
+      min-width:0;
+      overflow:auto;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,.015) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,.015) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,.015) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.015) 75%);
+      background-size:24px 24px;
+      background-position:0 0, 0 12px, 12px -12px, -12px 0;
+    }
 
-        .sidebar {
-            width: 340px;
-            background: var(--bg-panel);
-            border-left: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            padding: 30px 25px;
-            overflow-y: auto;
-            box-shadow: -5px 0 20px rgba(0,0,0,0.3);
-        }
+    .stage-inner{
+      position:relative;
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
 
-        h2 {
-            font-size: 24px;
-            margin-bottom: 25px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            color: #ffffff;
-        }
+    canvas{
+      display:none;
+      max-width:100%;
+      max-height:100%;
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      background:rgba(255,255,255,.03);
+    }
 
-        canvas {
-            max-width: 100%;
-            max-height: 100%;
-            border-radius: 8px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            background-image:
-                linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
-                linear-gradient(-45deg, #2a2a2a 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #2a2a2a 75%),
-                linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-        }
+    body.has-image canvas { display:block; }
 
-        .control-group { display: flex; flex-direction: column; margin-bottom: 20px; }
+    .empty{
+      width:min(420px, 90%);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:14px;
+      text-align:center;
+      color:var(--muted);
+    }
 
-        label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+    .empty-graphic{
+      width:50px;height:50px;
+      border-radius:16px;
+      border:1px solid var(--line);
+      background:var(--panel);
+      display:grid;place-items:center;
+    }
 
-        .file-upload-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
-            width: 100%;
-        }
+    .empty-graphic svg{
+      width:22px;height:22px;
+      stroke:var(--soft);
+      fill:none;
+      stroke-width:1.5;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+    }
 
-        .file-upload-wrapper input[type="file"] {
-            font-size: 100px;
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
-        }
+    .panel{
+      width:380px;
+      flex-shrink:0;
+      background:rgba(18,18,18,.92);
+      border-left:1px solid var(--line);
+      backdrop-filter:blur(8px);
+      display:flex;
+      flex-direction:column;
+      overflow-y:auto;
+    }
 
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 12px 15px;
-            background: var(--border);
-            color: var(--text-main);
-            border: 1px solid transparent;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 600;
-            text-align: center;
-            cursor: pointer;
-            transition: 0.2s;
-            font-family: inherit;
-        }
+    .topbar{
+      padding:24px 22px 18px;
+      border-bottom:1px solid var(--line);
+    }
 
-        .btn-primary {
-            background: var(--accent);
-            color: #fff;
-            margin-top: 10px;
-        }
+    .brand{
+      font-size:12px;
+      letter-spacing:.22em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-bottom:10px;
+    }
 
-        .btn:hover { background: #444; }
-        .btn-primary:hover { background: var(--accent-hover); }
+    .title{
+      font-size:26px;
+      font-weight:700;
+      letter-spacing:-.04em;
+      line-height:1.1;
+    }
 
-        .file-upload-wrapper input[type="file"]:focus-visible + .btn {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.4);
-        }
+    .section{
+      padding:20px 22px;
+      border-bottom:1px solid var(--line);
+    }
 
-        .file-name {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 8px;
-            word-break: break-all;
-            text-transform: none;
-            letter-spacing: 0;
-        }
+    .label-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:14px;
+      font-size:12px;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.12em;
+    }
 
-        .error-message {
-            color: var(--error);
-            font-size: 13px;
-            margin-top: 8px;
-            display: none;
-            font-weight: 500;
-        }
+    .muted-value{
+      color:var(--soft);
+      letter-spacing:.08em;
+      font-size:11px;
+    }
 
-        select, input[type="color"] {
-            width: 100%;
-            padding: 10px;
-            background: #2a2a2a;
-            color: #fff;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-family: inherit;
-            font-size: 14px;
-            cursor: pointer;
-        }
+    .upload{
+      position:relative;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      width:100%;
+      padding:14px 14px;
+      border:1px solid var(--line);
+      background:var(--panel-2);
+      border-radius:var(--radius-small);
+      cursor:pointer;
+      transition:all .15s ease;
+    }
 
-        input[type="color"] { height: 42px; padding: 2px; }
-        input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+    .upload:hover{
+      border-color:var(--line-strong);
+      background:var(--panel-3);
+    }
 
-        .color-row { display: flex; gap: 15px; }
+    #fileInput:focus-visible + .upload{
+      outline:2px solid rgba(255,255,255,.8);
+      outline-offset:2px;
+    }
 
-        .swatch-container {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 10px;
-        }
+    .fileInput{
+      position:absolute;
+      width:1px; height:1px;
+      opacity:0; pointer-events:none;
+    }
 
-        .swatch {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 2px solid var(--border);
-            transition: transform 0.2s, border-color 0.2s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
+    .upload-icon{
+      width:38px;height:38px;
+      border-radius:12px;
+      background:rgba(255,255,255,.02);
+      border:1px solid var(--line);
+      display:grid;place-items:center;
+      flex-shrink:0;
+    }
 
-        .swatch:hover {
-            transform: scale(1.15);
-            border-color: #fff;
-        }
+    .upload-icon svg{
+      width:18px;height:18px;
+      stroke:var(--text);
+      fill:none;
+      stroke-width:1.7;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+    }
 
-        @media (max-width: 800px) {
-            .app-container { flex-direction: column; }
-            .sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); max-height: 50vh; }
-            .canvas-area { padding: 20px; }
-        }
-    </style>
+    .upload-meta{
+      min-width:0;
+      flex:1;
+    }
+
+    .upload-title{
+      display:block;
+      font-size:13px;
+      font-weight:600;
+      margin-bottom:4px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .upload-sub{
+      display:block;
+      color:var(--muted);
+      font-size:12px;
+      overflow-wrap:anywhere;
+    }
+
+    .error{
+      display:none;
+      margin-top:10px;
+      font-size:12px;
+      color:var(--error);
+      line-height:1.4;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:10px;
+    }
+
+    .choice{
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      align-items:flex-start;
+      justify-content:space-between;
+      min-height:112px;
+      padding:12px 12px 14px;
+      background:var(--panel-2);
+      border:1px solid var(--line);
+      border-radius:var(--radius-small);
+      cursor:pointer;
+      transition:border-color .15s ease, background .15s ease, transform .15s ease;
+    }
+
+    .choice:hover{
+      background:var(--panel-3);
+      border-color:var(--line-strong);
+    }
+
+    .choice input{
+      position:absolute;
+      opacity:0;
+      pointer-events:none;
+    }
+
+    .choice-mark{
+      width:15px;height:15px;
+      border-radius:50%;
+      border:1.5px solid var(--soft);
+      display:grid;place-items:center;
+      background:transparent;
+      margin-left:auto;
+      position:relative;
+    }
+
+    .choice-mark::after{
+      content:"";
+      width:6px;height:6px;border-radius:50%;
+      background:var(--text);
+      transform:scale(0);
+      transition:transform .12s ease;
+    }
+
+    .choice svg{
+      width:18px;height:18px;
+      stroke:var(--muted);
+      fill:none;
+      stroke-width:1.5;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+      margin-bottom:auto;
+    }
+
+    .choice-name{
+      font-size:13px;
+      font-weight:600;
+    }
+
+    .choice input:checked + .choice {
+      border-color:rgba(255,255,255,.9);
+      background:rgba(255,255,255,.03);
+    }
+
+    .choice input:checked + .choice .choice-mark{
+      border-color:var(--text);
+      background:var(--text);
+    }
+
+    .choice input:checked + .choice .choice-mark::after{
+      transform:scale(1);
+      background:var(--bg);
+    }
+
+    .chip-group{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0,1fr));
+      gap:8px;
+    }
+
+    .chip{
+      position:relative;
+      display:block;
+      width:100%;
+      text-align:center;
+      padding:10px 8px;
+      border-radius:8px;
+      border:1px solid var(--line);
+      background:var(--panel-2);
+      color:var(--muted);
+      font-size:12px;
+      font-weight:600;
+      cursor:pointer;
+      transition:all .15s ease;
+    }
+
+    .chip input{
+      position:absolute;
+      opacity:0; pointer-events:none;
+    }
+
+    .chip input:checked + span{
+      color:var(--text);
+    }
+
+    .chip input:focus-visible + span{
+      outline:2px solid rgba(255,255,255,.8);
+      outline-offset:2px;
+    }
+
+    .chip span{
+      display:block;
+      width:100%;
+      border-radius:inherit;
+    }
+
+    .chip input:checked + span{
+      background:rgba(255,255,255,.04);
+      border-color:rgba(255,255,255,.7);
+    }
+
+    .chip:hover{
+      border-color:var(--line-strong);
+      color:var(--text);
+    }
+
+    .range-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    input[type="range"]{
+      width:100%;
+      appearance:none;
+      -webkit-appearance:none;
+      background:transparent;
+      height:20px;
+      cursor:pointer;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track{
+      height:3px;
+      background:#2c2c2c;
+      border-radius:999px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      width:15px;height:15px;
+      border-radius:50%;
+      background:#fff;
+      margin-top:-6px;
+      border:none;
+      box-shadow:0 0 0 2px rgba(255,255,255,.1);
+    }
+
+    input[type="range"]::-moz-range-track{
+      height:3px;
+      background:#2c2c2c;
+      border-radius:999px;
+    }
+
+    input[type="range"]::-moz-range-thumb{
+      width:15px;height:15px;border:none;
+      border-radius:50%;
+      background:#fff;
+    }
+
+    .swatch-wrap{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+
+    .swatch{
+      position:relative;
+      width:28px;height:28px;
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.08);
+      cursor:pointer;
+      display:grid;place-items:center;
+      box-shadow:0 0 0 1px rgba(0,0,0,.18);
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+
+    .swatch:hover{ transform:scale(1.08); }
+    .swatch input{
+      position:absolute;
+      opacity:0; pointer-events:none;
+    }
+
+    .swatch input:checked + span{
+      box-shadow:0 0 0 2px var(--bg), 0 0 0 4px rgba(255,255,255,.9);
+    }
+
+    .swatch input:focus-visible + span{
+      box-shadow:0 0 0 2px var(--bg), 0 0 0 4px rgba(255,255,255,.5);
+    }
+
+    .swatch span{
+      display:block;
+      width:100%;height:100%;
+      border-radius:50%;
+      background:inherit;
+    }
+
+    .color-list{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .color-row{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:var(--panel-2);
+    }
+
+    .color-label{
+      width:42px;
+      font-size:12px;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+
+    .hex{
+      margin-left:auto;
+      font-size:12px;
+      color:var(--soft);
+      letter-spacing:.08em;
+      font-variant-numeric:tabular-nums;
+    }
+
+    input[type="color"]{
+      -webkit-appearance:none;
+      appearance:none;
+      width:26px;height:26px;
+      padding:0;border:none;border-radius:50%;
+      background:none;overflow:hidden;cursor:pointer;
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper{ padding:0; }
+    input[type="color"]::-webkit-color-swatch{
+      border:none;border-radius:50%;
+      box-shadow:0 0 0 1px rgba(255,255,255,.2);
+    }
+    input[type="color"]::-moz-color-swatch{
+      border:none;border-radius:50%;
+      box-shadow:0 0 0 1px rgba(255,255,255,.2);
+    }
+
+    .footer{
+      padding:20px 22px 24px;
+      margin-top:auto;
+      border-top:1px solid var(--line);
+    }
+
+    .download-btn{
+      width:100%;
+      border:none;
+      border-radius:10px;
+      background:#f5f5f5;
+      color:#111;
+      font:inherit;
+      font-weight:700;
+      font-size:13px;
+      padding:12px 14px;
+      cursor:pointer;
+      transition:opacity .12s ease;
+    }
+
+    .download-btn:hover:not(:disabled){ opacity:.9; }
+    .download-btn:disabled{
+      background:var(--panel-3);
+      color:var(--soft);
+      cursor:not-allowed;
+    }
+
+    .status{
+      margin-top:10px;
+      text-align:center;
+      color:var(--soft);
+      font-size:11px;
+      letter-spacing:.04em;
+    }
+
+    @media (max-width: 860px){
+      .app-shell{
+        flex-direction:column;
+        height:auto;
+        min-height:100dvh;
+      }
+
+      .stage{
+        min-height:42vh;
+        padding:22px;
+      }
+
+      .panel{
+        width:100%;
+        border-left:none;
+        border-top:1px solid var(--line);
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="app-container">
-        <div class="canvas-area">
-            <canvas id="canvas"></canvas>
+  <div class="app-shell">
+    <main class="stage">
+      <div class="stage-inner">
+        <canvas id="previewCanvas"></canvas>
+
+        <div class="empty" id="emptyState">
+          <div class="empty-graphic">
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="3" width="18" height="18" rx="2.5"></rect>
+              <circle cx="9" cy="9" r="2"></circle>
+              <path d="M21 15l-5-5L5 21"></path>
+            </svg>
+          </div>
+          <p>Choose an image to begin</p>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel">
+      <div class="topbar">
+        <div class="brand">Brand System</div>
+        <div class="title">Texture Lab</div>
+      </div>
+
+      <section class="section">
+        <div class="label-row">
+          <span>Source</span>
         </div>
 
-        <div class="sidebar">
-            <h2>Branded Image Creator</h2>
+        <input id="fileInput" class="fileInput" type="file" accept="image/png,image/jpeg,image/webp" />
+        <label class="upload" for="fileInput">
+          <span class="upload-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 16V4"></path>
+              <path d="M7 9l5-5 5 5"></path>
+              <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
+            </svg>
+          </span>
+          <span class="upload-meta">
+            <span class="upload-title">Choose file</span>
+            <span class="upload-sub" id="fileName">No file selected</span>
+          </span>
+        </label>
 
-            <div class="control-group">
-                <label>Source Image</label>
-                <div class="file-upload-wrapper">
-                    <input type="file" id="upload" accept="image/png,image/jpeg,image/webp">
-                    <label class="btn" for="upload">Choose File...</label>
-                </div>
-                <div id="file-name" class="file-name">No file selected</div>
-                <div id="error-msg" class="error-message">Unsupported file. Please upload an image.</div>
-            </div>
+        <div class="error" id="errorBox" role="status"></div>
+      </section>
 
-            <div class="control-group">
-                <label for="patternType">Pattern Style</label>
-                <select id="patternType">
-                    <option value="dots">Dots (Standard)</option>
-                    <option value="lines">Lines (Engraving)</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label for="dotSize">Density / Size</label>
-                <input type="range" id="dotSize" min="4" max="25" value="8">
-            </div>
-
-            <div class="control-group">
-                <label for="textureLevel">Texture Jitter</label>
-                <input type="range" id="textureLevel" min="0" max="1" step="0.05" value="0.2">
-            </div>
-
-            <div class="control-group">
-                <label>Color Presets</label>
-                <div class="swatch-container" id="swatchContainer"></div>
-            </div>
-
-            <div class="color-row">
-                <div class="control-group" style="flex: 1;">
-                    <label for="darkColor">Ink Color</label>
-                    <input type="color" id="darkColor" value="#1a3b2b">
-                </div>
-                <div class="control-group" style="flex: 1;">
-                    <label for="lightColor">Base Color</label>
-                    <input type="color" id="lightColor" value="#e89c4a">
-                </div>
-            </div>
-
-            <button class="btn btn-primary" id="download">Download Result</button>
+      <section class="section">
+        <div class="label-row">
+          <span>Pattern</span>
         </div>
-    </div>
+        <div class="grid-2">
+          <label class="choice">
+            <input type="radio" name="pattern" value="dots" checked />
+            <span class="choice">
+              <svg viewBox="0 0 24 24">
+                <circle cx="7" cy="7" r="2.2"></circle>
+                <circle cx="17" cy="7" r="1.5"></circle>
+                <circle cx="7" cy="17" r="1.5"></circle>
+                <circle cx="17" cy="17" r="2.8"></circle>
+              </svg>
+              <span class="choice-name">Dots</span>
+              <span class="choice-mark"></span>
+            </span>
+          </label>
 
-    <script>
-        const upload = document.getElementById('upload');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const errorMsg = document.getElementById('error-msg');
+          <label class="choice">
+            <input type="radio" name="pattern" value="lines" />
+            <span class="choice">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 16L16 4"></path>
+                <path d="M8 20L20 8"></path>
+                <path d="M4 4L8 8"></path>
+              </svg>
+              <span class="choice-name">Lines</span>
+              <span class="choice-mark"></span>
+            </span>
+          </label>
+        </div>
+      </section>
 
-        const patternTypeInput = document.getElementById('patternType');
-        const dotSizeInput = document.getElementById('dotSize');
-        const textureLevelInput = document.getElementById('textureLevel');
+      <section class="section">
+        <div class="label-row">
+          <span>Density</span>
+          <span class="muted-value" id="densityLabel">8 px</span>
+        </div>
 
-        const darkColorInput = document.getElementById('darkColor');
-        const lightColorInput = document.getElementById('lightColor');
-        const swatchContainer = document.getElementById('swatchContainer');
-        const downloadBtn = document.getElementById('download');
-        const fileNameEl = document.getElementById('file-name');
+        <div class="chip-group" id="densityGroup"></div>
+      </section>
 
-        const MAX_PREVIEW_DIMENSION = 1500;
+      <section class="section">
+        <div class="label-row">
+          <span>Texture</span>
+          <span class="muted-value" id="textureLabel">0.20</span>
+        </div>
 
-        const MAX_EXPORT_DIMENSION = 4096;
-        const MAX_EXPORT_PIXELS = 12e6;
+        <div class="range-wrap">
+          <input id="textureRange" type="range" min="0" max="1" step="0.05" value="0.2" />
+        </div>
+      </section>
 
-        const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
-        const ALLOWED_EXTENSIONS = /\.(png|jpe?g|webp)$/i;
+      <section class="section">
+        <div class="label-row">
+          <span>Palette</span>
+        </div>
+        <div class="swatch-wrap" id="swatchWrap"></div>
+      </section>
 
-        let originalImage = new Image();
-        let cachedImageData = null;
-        let cachedImageSize = { width: 0, height: 0 };
-        let currentObjectUrl = null;
-        let renderScheduled = false;
+      <section class="section">
+        <div class="label-row">
+          <span>Colours</span>
+        </div>
 
-        const palettes = [
-            { dark: '#1a3b2b', light: '#e89c4a', name: 'Forest & Orange' },
-            { dark: '#0a1945', light: '#e1cbf4', name: 'Navy & Lavender' },
-            { dark: '#000000', light: '#ffffff', name: 'Classic B&W' },
-            { dark: '#0033aa', light: '#e6f0ff', name: 'Blueprint' },
-            { dark: '#4a2c11', light: '#f5e3d2', name: 'Sepia' },
-            { dark: '#1a0b2e', light: '#ff007f', name: 'Cyberpunk Neon' },
-            { dark: '#3b0000', light: '#ffeb3b', name: 'Crimson & Gold' }
-        ];
+        <div class="color-list">
+          <div class="color-row">
+            <label class="color-label" for="inkColor">Ink</label>
+            <span class="hex" id="inkHex">#1A3B2B</span>
+            <input id="inkColor" type="color" value="#1a3b2b" />
+          </div>
 
-        palettes.forEach(p => {
-            const swatch = document.createElement('div');
-            swatch.className = 'swatch';
-            swatch.title = p.name;
-            swatch.style.background = `linear-gradient(135deg, ${p.dark} 50%, ${p.light} 50%)`;
+          <div class="color-row">
+            <label class="color-label" for="baseColor">Base</label>
+            <span class="hex" id="baseHex">#E89C4A</span>
+            <input id="baseColor" type="color" value="#e89c4a" />
+          </div>
+        </div>
+      </section>
 
-            swatch.addEventListener('click', () => {
-                darkColorInput.value = p.dark;
-                lightColorInput.value = p.light;
-                if (cachedImageData) scheduleRender();
-            });
-            swatchContainer.appendChild(swatch);
+      <div class="footer">
+        <button id="downloadBtn" class="download-btn" disabled>Download PNG</button>
+        <div class="status" id="statusText">Images stay on your device</div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const errorBox = document.getElementById('errorBox');
+    const fileNameEl = document.getElementById('fileName');
+    const textureRange = document.getElementById('textureRange');
+    const textureLabel = document.getElementById('textureLabel');
+    const densityLabel = document.getElementById('densityLabel');
+    const swatchWrap = document.getElementById('swatchWrap');
+    const densityGroup = document.getElementById('densityGroup');
+    const inkColor = document.getElementById('inkColor');
+    const baseColor = document.getElementById('baseColor');
+    const inkHex = document.getElementById('inkHex');
+    const baseHex = document.getElementById('baseHex');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const statusText = document.getElementById('statusText');
+    const previewCanvas = document.getElementById('previewCanvas');
+    const ctx = previewCanvas.getContext('2d');
+    const emptyState = document.getElementById('emptyState');
+
+    const DOT_SIZES = [4, 6, 8, 12, 16, 22];
+    const MAX_PREVIEW_DIMENSION = 1500;
+    const MAX_EXPORT_DIMENSION = 4096;
+    const MAX_EXPORT_PIXELS = 12e6;
+    const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+    const ALLOWED_EXT = /\.(png|jpe?g|webp)$/i;
+
+    const palettes = [
+      { dark:'#1a3b2b', light:'#e89c4a', name:'Forest' },
+      { dark:'#0d1638', light:'#d7d0ff', name:'Night' },
+      { dark:'#111111', light:'#f7f7f7', name:'Mono' },
+      { dark:'#0c4a7a', light:'#dbeafe', name:'Blue' },
+      { dark:'#472112', light:'#f5d9ae', name:'Amber' },
+      { dark:'#3d093b', light:'#ffd9f2', name:'Rose' }
+    ];
+
+    const originalImage = new Image();
+    let cachedImageData = null;
+    let cachedSize = { width:0, height:0 };
+    let currentObjectUrl = null;
+    let pendingRender = false;
+
+    function setStatus(text){ statusText.textContent = text; }
+
+    function showError(message){
+      errorBox.textContent = message || 'Unsupported file. Choose a PNG, JPG, or WebP.';
+      errorBox.style.display = 'block';
+    }
+
+    function clearError(){
+      errorBox.style.display = 'none';
+    }
+
+    function updateHexLabels(){
+      inkHex.textContent = inkColor.value.toUpperCase();
+      baseHex.textContent = baseColor.value.toUpperCase();
+    }
+
+    function releaseObjectURL(){
+      if (currentObjectUrl) {
+        URL.revokeObjectURL(currentObjectUrl);
+        currentObjectUrl = null;
+      }
+    }
+
+    function resetImage(){
+      cachedImageData = null;
+      cachedSize = { width:0, height:0 };
+      previewCanvas.width = 0;
+      previewCanvas.height = 0;
+      document.body.classList.remove('has-image');
+      emptyState.style.display = 'flex';
+      downloadBtn.disabled = true;
+    }
+
+    function fitWithin(width, height, maxDimension, maxPixels){
+      let scale = Math.min(1, maxDimension / Math.max(width, height));
+      const pixels = (width * scale) * (height * scale);
+      if (pixels > maxPixels) {
+        scale *= Math.sqrt(maxPixels / pixels);
+      }
+      return {
+        width: Math.max(1, Math.round(width * scale)),
+        height: Math.max(1, Math.round(height * scale))
+      };
+    }
+
+    function createImageData(img, width, height, readFrequently){
+      const off = document.createElement('canvas');
+      off.width = width;
+      off.height = height;
+      const offCtx = off.getContext('2d', { willReadFrequently: !!readFrequently });
+      offCtx.drawImage(img, 0, 0, width, height);
+      return {
+        data: offCtx.getImageData(0, 0, width, height),
+        width,
+        height
+      };
+    }
+
+    function preparePreview(){
+      const sourceW = originalImage.naturalWidth || originalImage.width;
+      const sourceH = originalImage.naturalHeight || originalImage.height;
+      const size = fitWithin(sourceW, sourceH, MAX_PREVIEW_DIMENSION, MAX_PREVIEW_DIMENSION * MAX_PREVIEW_DIMENSION);
+      const prepared = createImageData(originalImage, size.width, size.height, true);
+      cachedImageData = prepared.data;
+      cachedSize = { width: prepared.width, height: prepared.height };
+    }
+
+    function getSettings(){
+      return {
+        patternType: document.querySelector('input[name="pattern"]:checked').value,
+        dotSize: Number(document.querySelector('input[name="density"]:checked').value),
+        textureLevel: parseFloat(textureRange.value),
+        darkColor: inkColor.value,
+        lightColor: baseColor.value
+      };
+    }
+
+    function renderHalftone(targetCtx, imageData, width, height, settings){
+      const pixels = imageData.data;
+      const { patternType, dotSize, textureLevel, darkColor, lightColor } = settings;
+
+      targetCtx.clearRect(0, 0, width, height);
+
+      for (let y = 0; y < height; y += dotSize) {
+        for (let x = 0; x < width; x += dotSize) {
+          let sumLum = 0;
+          let sumAlpha = 0;
+          let count = 0;
+
+          for (let dy = 0; dy < dotSize; dy++) {
+            for (let dx = 0; dx < dotSize; dx++) {
+              const cx = x + dx;
+              const cy = y + dy;
+              if (cx >= width || cy >= height) continue;
+
+              const i = (cy * width + cx) * 4;
+              const r = pixels[i];
+              const g = pixels[i + 1];
+              const b = pixels[i + 2];
+              const a = pixels[i + 3];
+
+              sumLum += 0.299 * r + 0.587 * g + 0.114 * b;
+              sumAlpha += a;
+              count++;
+            }
+          }
+
+          if (!count) continue;
+          const avgAlpha = sumAlpha / count;
+          if (avgAlpha < 15) continue;
+
+          targetCtx.fillStyle = lightColor;
+          targetCtx.fillRect(x, y, dotSize, dotSize);
+
+          let avgLum = sumLum / count;
+          const noise = (Math.random() - 0.5) * 100 * textureLevel;
+          avgLum = Math.max(0, Math.min(255, avgLum + noise));
+
+          const darkness = 1 - (avgLum / 255);
+          const sizeAdj = 1.3 + (Math.random() - 0.5) * textureLevel * 0.6;
+
+          const jitterX = (Math.random() - 0.5) * textureLevel * dotSize * 0.45;
+          const jitterY = (Math.random() - 0.5) * textureLevel * dotSize * 0.45;
+          const centerX = x + dotSize / 2 + jitterX;
+          const centerY = y + dotSize / 2 + jitterY;
+
+          if (patternType === 'dots') {
+            const radius = (dotSize / 2) * darkness * sizeAdj;
+            if (radius > 0.5) {
+              targetCtx.fillStyle = darkColor;
+              targetCtx.beginPath();
+              targetCtx.arc(centerX, centerY, Math.min(Math.abs(radius), dotSize * 1.5), 0, Math.PI * 2);
+              targetCtx.fill();
+            }
+          } else {
+            const lineWidth = dotSize * darkness * sizeAdj * 1.2;
+            if (lineWidth > 0.5) {
+              targetCtx.strokeStyle = darkColor;
+              targetCtx.lineWidth = Math.min(lineWidth, dotSize * 1.5);
+              targetCtx.lineCap = 'round';
+              targetCtx.beginPath();
+
+              const angle = Math.PI / 4;
+              const length = dotSize * 1.5;
+              const dx = Math.cos(angle) * (length / 2);
+              const dy = Math.sin(angle) * (length / 2);
+
+              targetCtx.moveTo(centerX - dx, centerY - dy);
+              targetCtx.lineTo(centerX + dx, centerY + dy);
+              targetCtx.stroke();
+            }
+          }
+        }
+      }
+    }
+
+    function drawPreview(){
+      if (!cachedImageData) return;
+
+      previewCanvas.width = cachedSize.width;
+      previewCanvas.height = cachedSize.height;
+
+      renderHalftone(ctx, cachedImageData, cachedSize.width, cachedSize.height, getSettings());
+
+      document.body.classList.add('has-image');
+      emptyState.style.display = 'none';
+      downloadBtn.disabled = false;
+    }
+
+    function scheduleRender(){
+      if (!cachedImageData || pendingRender) return;
+      pendingRender = true;
+      requestAnimationFrame(() => {
+        pendingRender = false;
+        drawPreview();
+      });
+    }
+
+    function buildDensityControls(){
+      DOT_SIZES.forEach(size => {
+        const id = 'density-' + size;
+
+        const option = document.createElement('label');
+        option.className = 'chip';
+
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'density';
+        radio.value = String(size);
+        radio.id = id;
+        if (size === 8) radio.checked = true;
+
+        const text = document.createElement('span');
+        text.textContent = size + ' px';
+
+        radio.addEventListener('change', () => {
+          densityLabel.textContent = size + ' px';
+          scheduleRender();
         });
 
-        function showError(message = 'Unsupported file. Please upload an image.') {
-            errorMsg.textContent = message;
-            errorMsg.style.display = 'block';
-        }
+        option.appendChild(radio);
+        option.appendChild(text);
+        densityGroup.appendChild(option);
+      });
 
-        function clearError() {
-            errorMsg.style.display = 'none';
-        }
+      densityLabel.textContent = '8 px';
+    }
 
-        function releaseObjectUrl() {
-            if (currentObjectUrl) {
-                URL.revokeObjectURL(currentObjectUrl);
-                currentObjectUrl = null;
-            }
-        }
+    function buildPaletteSwatches(){
+      palettes.forEach((palette, index) => {
+        const label = document.createElement('label');
+        label.className = 'swatch';
+        label.title = palette.name;
 
-        function resetImage() {
-            cachedImageData = null;
-            cachedImageSize = { width: 0, height: 0 };
-            canvas.width = 0;
-            canvas.height = 0;
-        }
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'palette';
+        input.checked = index === 0;
+        input.setAttribute('aria-label', palette.name);
 
-        function fitWithin(width, height, maxDimension, maxPixels) {
-            let scale = Math.min(1, maxDimension / Math.max(width, height));
-            const pixels = (width * scale) * (height * scale);
-            if (pixels > maxPixels) scale *= Math.sqrt(maxPixels / pixels);
-            return {
-                width: Math.max(1, Math.round(width * scale)),
-                height: Math.max(1, Math.round(height * scale))
-            };
-        }
+        const swatch = document.createElement('span');
+        swatch.style.background = 'linear-gradient(135deg, ' + palette.dark + ' 50%, ' + palette.light + ' 50%)';
 
-        function createImageDataFromImage(img, width, height, willReadFrequently = false) {
-            const offscreenCanvas = document.createElement('canvas');
-            offscreenCanvas.width = width;
-            offscreenCanvas.height = height;
-            const offCtx = offscreenCanvas.getContext('2d', { willReadFrequently });
-            offCtx.drawImage(img, 0, 0, width, height);
-            return { imageData: offCtx.getImageData(0, 0, width, height), width, height };
-        }
-
-        function preparePreviewImageData() {
-            const sourceWidth = originalImage.naturalWidth || originalImage.width;
-            const sourceHeight = originalImage.naturalHeight || originalImage.height;
-            const { width, height } = fitWithin(
-                sourceWidth, sourceHeight, MAX_PREVIEW_DIMENSION, MAX_PREVIEW_DIMENSION * MAX_PREVIEW_DIMENSION
-            );
-            const prepared = createImageDataFromImage(originalImage, width, height, true);
-            cachedImageData = prepared.imageData;
-            cachedImageSize = { width: prepared.width, height: prepared.height };
-        }
-
-        function renderHalftoneToContext(targetCtx, imageData, width, height, settings) {
-            const { patternType, dotSize, textureLevel, darkColor, lightColor } = settings;
-            const pixels = imageData.data;
-
-            targetCtx.clearRect(0, 0, width, height);
-
-            for (let y = 0; y < height; y += dotSize) {
-                for (let x = 0; x < width; x += dotSize) {
-                    let totalLuminance = 0;
-                    let totalAlpha = 0;
-                    let pixelCount = 0;
-
-                    for (let dy = 0; dy < dotSize; dy++) {
-                        for (let dx = 0; dx < dotSize; dx++) {
-                            const currentX = x + dx;
-                            const currentY = y + dy;
-                            if (currentX >= width || currentY >= height) continue;
-
-                            const i = (currentY * width + currentX) * 4;
-                            const r = pixels[i];
-                            const g = pixels[i + 1];
-                            const b = pixels[i + 2];
-                            const a = pixels[i + 3];
-
-                            totalLuminance += (0.299 * r + 0.587 * g + 0.114 * b);
-                            totalAlpha += a;
-                            pixelCount++;
-                        }
-                    }
-
-                    if (!pixelCount) continue;
-
-                    const avgAlpha = totalAlpha / pixelCount;
-                    if (avgAlpha < 15) continue;
-
-                    targetCtx.fillStyle = lightColor;
-                    targetCtx.fillRect(x, y, dotSize, dotSize);
-
-                    let avgLuminance = totalLuminance / pixelCount;
-                    const noise = (Math.random() - 0.5) * 100 * textureLevel;
-                    avgLuminance = Math.max(0, Math.min(255, avgLuminance + noise));
-
-                    const darkness = 1 - (avgLuminance / 255);
-                    const sizeMultiplier = 1.3 + (Math.random() - 0.5) * textureLevel * 0.6;
-
-                    const jitterX = (Math.random() - 0.5) * textureLevel * dotSize * 0.4;
-                    const jitterY = (Math.random() - 0.5) * textureLevel * dotSize * 0.4;
-
-                    const centerX = x + (dotSize / 2) + jitterX;
-                    const centerY = y + (dotSize / 2) + jitterY;
-
-                    if (patternType === 'dots') {
-                        const radius = (dotSize / 2) * darkness * sizeMultiplier;
-                        if (radius > 0.5) {
-                            targetCtx.fillStyle = darkColor;
-                            targetCtx.beginPath();
-                            targetCtx.arc(centerX, centerY, Math.min(Math.abs(radius), dotSize * 1.5), 0, Math.PI * 2);
-                            targetCtx.fill();
-                        }
-                    } else if (patternType === 'lines') {
-                        const lineWidth = dotSize * darkness * sizeMultiplier * 1.2;
-                        if (lineWidth > 0.5) {
-                            targetCtx.strokeStyle = darkColor;
-                            targetCtx.lineWidth = Math.min(lineWidth, dotSize * 1.5);
-                            targetCtx.lineCap = 'round';
-                            targetCtx.beginPath();
-
-                            const angle = Math.PI / 4;
-                            const length = dotSize * 1.5;
-                            const dx = Math.cos(angle) * (length / 2);
-                            const dy = Math.sin(angle) * (length / 2);
-
-                            targetCtx.moveTo(centerX - dx, centerY - dy);
-                            targetCtx.lineTo(centerX + dx, centerY + dy);
-                            targetCtx.stroke();
-                        }
-                    }
-                }
-            }
-        }
-
-        function generateHalftone() {
-            if (!cachedImageData) return;
-
-            canvas.width = cachedImageSize.width;
-            canvas.height = cachedImageSize.height;
-
-            renderHalftoneToContext(ctx, cachedImageData, cachedImageSize.width, cachedImageSize.height, {
-                patternType: patternTypeInput.value,
-                dotSize: parseInt(dotSizeInput.value, 10),
-                textureLevel: parseFloat(textureLevelInput.value),
-                darkColor: darkColorInput.value,
-                lightColor: lightColorInput.value
-            });
-        }
-
-        function scheduleRender() {
-            if (!cachedImageData || renderScheduled) return;
-            renderScheduled = true;
-            requestAnimationFrame(() => {
-                renderScheduled = false;
-                generateHalftone();
-            });
-        }
-
-        upload.addEventListener('change', function(e) {
-            clearError();
-            const file = e.target.files && e.target.files[0];
-            if (!file) return;
-
-            const type = file.type ? file.type.toLowerCase() : '';
-            const hasValidExtension = ALLOWED_EXTENSIONS.test(file.name || '');
-            const isAllowed = type ? ALLOWED_IMAGE_TYPES.has(type) : hasValidExtension;
-            if (!isAllowed) {
-                showError();
-                upload.value = '';
-                fileNameEl.textContent = 'No file selected';
-                return;
-            }
-
-            releaseObjectUrl();
-            fileNameEl.textContent = file.name || 'Selected image';
-
-            currentObjectUrl = URL.createObjectURL(file);
-            originalImage.onload = () => {
-                preparePreviewImageData();
-                scheduleRender();
-            };
-            originalImage.onerror = () => {
-                releaseObjectUrl();
-                resetImage();
-                upload.value = '';
-                fileNameEl.textContent = 'No file selected';
-                showError('Could not load image. Please choose a valid PNG, JPG, or WebP file.');
-            };
-            originalImage.src = currentObjectUrl;
+        input.addEventListener('change', () => {
+          inkColor.value = palette.dark;
+          baseColor.value = palette.light;
+          updateHexLabels();
+          scheduleRender();
         });
 
-        [patternTypeInput, dotSizeInput, textureLevelInput, darkColorInput, lightColorInput].forEach(input => {
-            input.addEventListener('input', () => {
-                if (cachedImageData) scheduleRender();
-            });
-        });
+        label.appendChild(input);
+        label.appendChild(swatch);
+        swatchWrap.appendChild(label);
+      });
+    }
 
-        downloadBtn.addEventListener('click', () => {
-            if (!cachedImageData) {
-                alert('Please upload an image first!');
-                return;
-            }
+    fileInput.addEventListener('change', function (e) {
+      clearError();
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
 
-            const sourceWidth = originalImage.naturalWidth || originalImage.width;
-            const sourceHeight = originalImage.naturalHeight || originalImage.height;
+      const type = file.type ? file.type.toLowerCase() : '';
+      const validExt = ALLOWED_EXT.test(file.name || '');
+      const allowed = type ? ALLOWED_TYPES.has(type) : validExt;
 
-            const exportSize = fitWithin(
-                sourceWidth, sourceHeight, MAX_EXPORT_DIMENSION, MAX_EXPORT_PIXELS
-            );
+      if (!allowed) {
+        fileInput.value = '';
+        fileNameEl.textContent = 'No file selected';
+        showError('Unsupported file. Please choose a PNG, JPG, or WebP.');
+        return;
+      }
 
-            const exportScale = exportSize.width / cachedImageSize.width;
-            const exportDotSize = Math.max(
-                1, Math.round(parseInt(dotSizeInput.value, 10) * exportScale)
-            );
+      releaseObjectURL();
+      fileNameEl.textContent = file.name || 'Selected image';
+      setStatus('Images stay on your device');
 
-            const fullImage = createImageDataFromImage(
-                originalImage, exportSize.width, exportSize.height
-            );
-            const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = exportSize.width;
-            exportCanvas.height = exportSize.height;
-            const exportCtx = exportCanvas.getContext('2d');
+      currentObjectUrl = URL.createObjectURL(file);
+      originalImage.onload = function () {
+        preparePreview();
+        scheduleRender();
+      };
 
-            renderHalftoneToContext(exportCtx, fullImage.imageData, exportSize.width, exportSize.height, {
-                patternType: patternTypeInput.value,
-                dotSize: exportDotSize,
-                textureLevel: parseFloat(textureLevelInput.value),
-                darkColor: darkColorInput.value,
-                lightColor: lightColorInput.value
-            });
+      originalImage.onerror = function () {
+        releaseObjectURL();
+        resetImage();
+        fileInput.value = '';
+        fileNameEl.textContent = 'No file selected';
+        showError('That file could not be opened. Try another PNG, JPG, or WebP.');
+      };
 
-            exportCanvas.toBlob((blob) => {
-                if (!blob) {
-                    alert('Could not generate the download for this image. Please try a smaller file.');
-                    return;
-                }
+      originalImage.src = currentObjectUrl;
+    });
 
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.download = 'halftone-gen-output.png';
-                link.href = url;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-            }, 'image/png');
-        });
-    </script>
+    textureRange.addEventListener('input', function () {
+      textureLabel.textContent = parseFloat(textureRange.value).toFixed(2);
+      scheduleRender();
+    });
+
+    document.querySelectorAll('input[name="pattern"]').forEach(input => {
+      input.addEventListener('change', scheduleRender);
+    });
+
+    inkColor.addEventListener('input', function () {
+      updateHexLabels();
+      scheduleRender();
+    });
+
+    baseColor.addEventListener('input', function () {
+      updateHexLabels();
+      scheduleRender();
+    });
+
+    downloadBtn.addEventListener('click', function () {
+      if (!cachedImageData) return;
+
+      const settings = getSettings();
+      const sourceW = originalImage.naturalWidth || originalImage.width;
+      const sourceH = originalImage.naturalHeight || originalImage.height;
+
+      const exportSize = fitWithin(sourceW, sourceH, MAX_EXPORT_DIMENSION, MAX_EXPORT_PIXELS);
+      const scale = exportSize.width / cachedSize.width;
+      const exportDotSize = Math.max(1, Math.round(settings.dotSize * scale));
+
+      const full = createImageData(originalImage, exportSize.width, exportSize.height, false);
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = exportSize.width;
+      exportCanvas.height = exportSize.height;
+
+      renderHalftone(exportCanvas.getContext('2d'), full.data, exportSize.width, exportSize.height, {
+        ...settings,
+        dotSize: exportDotSize
+      });
+
+      exportCanvas.toBlob(function (blob) {
+        if (!blob) {
+          setStatus('Export failed. Try a smaller file.');
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = 'brand-texture-export.png';
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setStatus('Saved at ' + exportSize.width + ' × ' + exportSize.height);
+      }, 'image/png');
+    });
+
+    buildDensityControls();
+    buildPaletteSwatches();
+    updateHexLabels();
+    textureLabel.textContent = parseFloat(textureRange.value).toFixed(2);
+  </script>
 </body>
 </html>
