@@ -612,6 +612,19 @@
               <span class="pattern-name">Lines</span>
             </span>
           </label>
+
+          <label class="pattern-choice">
+            <input type="radio" name="pattern" value="watercolor" />
+            <span class="pattern-card">
+              <span class="pattern-top">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3c2.7 3.4 6.5 6 6.5 10.1A6.5 6.5 0 0 1 12 19.6 6.5 6.5 0 0 1 5.5 13.1C5.5 9 9.3 6.4 12 3z"></path>
+                </svg>
+                <span class="pattern-dot"></span>
+              </span>
+              <span class="pattern-name">Watercolor</span>
+            </span>
+          </label>
         </div>
       </section>
 
@@ -855,7 +868,7 @@
               targetCtx.arc(centerX, centerY, Math.min(Math.abs(radius), dotSize * 1.5), 0, Math.PI * 2);
               targetCtx.fill();
             }
-          } else {
+          } else if (patternType === 'lines') {
             const lineDarkness = Math.max(0.2, Math.min(0.9, darkness * 0.72));
             const lineWidth = dotSize * lineDarkness * sizeAdj * 0.8;
             if (lineWidth > 0.5) {
@@ -872,6 +885,23 @@
               targetCtx.moveTo(centerX - dx, centerY - dy);
               targetCtx.lineTo(centerX + dx, centerY + dy);
               targetCtx.stroke();
+            }
+          } else {
+            const blobRadius = (dotSize * 0.9) * (0.35 + darkness * 0.95) * sizeAdj;
+            if (blobRadius > 0.8) {
+              const prevAlpha = targetCtx.globalAlpha;
+              targetCtx.fillStyle = darkColor;
+              targetCtx.globalAlpha = Math.min(0.65, 0.18 + darkness * 0.42);
+              targetCtx.beginPath();
+              targetCtx.arc(centerX, centerY, blobRadius, 0, Math.PI * 2);
+              targetCtx.fill();
+
+              targetCtx.globalAlpha = Math.min(0.5, 0.12 + darkness * 0.26);
+              targetCtx.beginPath();
+              targetCtx.arc(centerX - dotSize * 0.15, centerY + dotSize * 0.1, blobRadius * 0.8, 0, Math.PI * 2);
+              targetCtx.fill();
+
+              targetCtx.globalAlpha = prevAlpha;
             }
           }
         }
