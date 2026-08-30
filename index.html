@@ -527,6 +527,54 @@
       letter-spacing:.04em;
     }
 
+    .github-link{
+      position:fixed;
+      top:18px;
+      left:18px;
+      z-index:20;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(15,15,15,.8);
+      color:var(--text);
+      border-radius:999px;
+      text-decoration:none;
+      box-shadow:0 10px 24px rgba(0,0,0,.25);
+      backdrop-filter:blur(10px);
+      transition:transform .15s ease, border-color .15s ease, background .15s ease;
+    }
+
+    .github-link:hover{
+      transform:translateY(-1px);
+      border-color:rgba(255,255,255,.18);
+      background:rgba(24,24,24,.9);
+    }
+
+    .github-icon{
+      width:18px;
+      height:18px;
+      display:inline-block;
+      color:var(--text);
+      flex-shrink:0;
+    }
+
+    .github-icon svg{
+      width:100%;
+      height:100%;
+      display:block;
+      fill:currentColor;
+    }
+
+    .github-label{
+      font-size:11px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:var(--muted);
+      font-weight:600;
+    }
+
     @media (max-width: 860px){
       .app-shell{
         flex-direction:column;
@@ -548,6 +596,15 @@
   </style>
 </head>
 <body>
+  <a class="github-link" href="https://github.com/rtralrayhan/simple_branded_image_generator" target="_blank" rel="noreferrer" aria-label="View GitHub repository">
+    <span class="github-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2.2a9.8 9.8 0 0 0-3.1 19.1c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.2-3.4-1.2-.4-1.1-1-1.4-1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.5 1.1 3.1.9.1-.7.4-1.1.7-1.4-2.2-.3-4.5-1.1-4.5-4.8 0-1.1.4-2 1-2.7-.1-.3-.4-1.4.1-2.8 0 0 .8-.3 2.8 1a9.4 9.4 0 0 1 5 0c2-1.3 2.8-1 2.8-1 .5 1.4.2 2.5.1 2.8.7.7 1 1.6 1 2.7 0 3.7-2.3 4.5-4.5 4.8.4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A9.8 9.8 0 0 0 12 2.2Z"/>
+      </svg>
+    </span>
+    <span class="github-label">Star</span>
+  </a>
+
   <div class="app-shell">
     <main class="stage">
       <div class="stage-inner">
